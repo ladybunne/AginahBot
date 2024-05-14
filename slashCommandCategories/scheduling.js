@@ -3,6 +3,7 @@ const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { generalErrorHandler } = require('../errorHandlers');
 const { dbQueryOne, dbQueryAll, dbExecute, updateScheduleBoard, verifyModeratorRole} = require('../lib');
 const forbiddenWords = require('../assets/forbiddenWords.json');
+const calendarStuff = require('../calendarStuff.js');
 
 const isRolePingable = async (guildId, role) => {
   // Prevent pinging the @everyone role in all cases
@@ -750,5 +751,61 @@ module.exports = {
         return interaction.followUp(toggle ? 'Event threads enabled.' : 'Event threads disabled.');
       }
     },
+    {
+      commandBuilder: new SlashCommandBuilder()
+        .setName('schedule-calendar')
+        .setDescription('Enable or disable Google Calendar integration.')
+        .addBooleanOption((opt) => opt
+          .setName('toggle' )
+          .setDescription('True to enable, False to disable')
+          .setRequired(true))
+        .setDMPermission(false)
+        .setDefaultMemberPermissions(0),
+      async execute(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+        const toggle = interaction.options.getBoolean('toggle', true);
+
+        // Fetch guild data
+        const guildData = await dbQueryOne('SELECT id FROM guild_data WHERE guildId=?', [interaction.guild.id]);
+        if (!guildData) {
+          await interaction.followUp('Unable to complete request. An error was logged.');
+          throw new Error(`Unable to find guildData entry for guild with id ${interaction.guild.id}`);
+        }
+        
+        // Do calendar stuff here! :D
+        const calendarId = await dbQueryOne('SELECT gCalendarId FROM guild_data WHERE guildId=?', [interaction.guild.id]).gCalendarId;
+        console.log(calendarId);
+
+        if(calendarId) {
+          if(toggle) {
+            const calendarLink = calendarStuff.createLinkFromCalendarId(calendarId);
+            return interaction.followUp(`Google Calendar integration is already enabled. The calendar for this server can be found here:\n<${calendarLink}>`);
+          }
+          else {
+            const deleteOutcome = calendarStuff.deleteCalendar(calendarId);
+
+            if(deleteOutcome) {
+              await dbExecute('UPDATE guild_options SET gCalendarId=? WHERE guildDataId=?', [null, guildData.id]);
+              return interaction.followUp(`Google Calendar integration disabled.`);
+            }
+            else {
+              return interaction.followUp(`Google Calendar could not be disabled due to an error.`);
+            }
+          }
+        }
+        else {
+          if(toggle) {
+            const newCalendarId = await calendarStuff.createCalendar("New Calendar!");
+            await dbExecute('UPDATE guild_options SET gCalendarId=? WHERE guildDataId=?', [newCalendarId, guildData.id]);
+
+            const calendarLink = calendarStuff.createLinkFromCalendarId(newCalendarId);
+            return interaction.followUp(`Google Calendar integration enabled. The calendar for this server can be found here:\n<${calendarLink}>`);
+          }
+          else {
+            return interaction.followUp(`Google Calendar integration is already disabled.`);
+          }
+        } 
+      }
+    }
   ],
 };

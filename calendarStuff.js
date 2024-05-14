@@ -1,6 +1,6 @@
 const { google } = require('googleapis');
-const config = require('./config.json');
 const { calendar } = require('googleapis/build/src/apis/calendar');
+const config = require('./config.json');
 
 // create new JWT client
 const jwtClient = new google.auth.JWT(
@@ -28,20 +28,16 @@ function createLinkFromCalendarId(id) {
 // Create a calendar and make it public.
 // TODO take a guild id and use it for database stuff
 // TODO put the calendar id in the database
-function createCalendar(name) {
-    // Calendar resource data
-    const newCalendarData = {
-        "summary": name
-    };
+async function createCalendar(name) {
 
     // Create the calendar
     calendarAPI.calendars.insert({
         auth: jwtClient,
-        resource: newCalendarData
+        resource: { "summary": name }
     }, function(err, result) {
         if(err) {
             console.log('There was an error contacting the Calendar service: ' + err);
-            return;
+            return "";
         }
         console.log("Calendar created: ", result.data);
         const calendarId = result.data.items[0].id;
@@ -54,16 +50,27 @@ function createCalendar(name) {
         }, function(err, result) {
             if(err) {
                 console.log('There was an error contacting the Calendar service: ' + err);
-                return;
+                return "";
             }
             console.log("Here is the thing you wanted. ", result.data);
+            return calendarId;
         });
     });
 }
 
 
-function deleteCalendar() {
-
+// Delete a calendar.
+function deleteCalendar(id) {
+    calendarAPI.calendars.delete({
+        auth: jwtClient,
+        resource: { "calendarId": id }
+    }, function(err, result) {
+        if(err) {
+            console.log('There was an error contacting the Calendar service: ' + err);
+            return false;
+        }
+        return true;
+    });
 }
 
 function addEvent() {
@@ -131,6 +138,8 @@ function cancelEvent() {
 // });
 
 
-
-
 // createCalendar("Test Calendar");
+
+exports.createLinkFromCalendarId = createLinkFromCalendarId;
+exports.createCalendar = createCalendar;
+exports.deleteCalendar = deleteCalendar;
