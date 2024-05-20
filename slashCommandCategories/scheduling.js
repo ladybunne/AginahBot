@@ -766,26 +766,28 @@ module.exports = {
         const toggle = interaction.options.getBoolean('toggle', true);
 
         // Fetch guild data
-        const guildData = await dbQueryOne('SELECT id FROM guild_data WHERE guildId=?', [interaction.guild.id]);
+        const guildData = await dbQueryOne('SELECT id, gCalendarId FROM guild_data WHERE guildId=?', [interaction.guild.id]);
         if (!guildData) {
           await interaction.followUp('Unable to complete request. An error was logged.');
           throw new Error(`Unable to find guildData entry for guild with id ${interaction.guild.id}`);
         }
         
         // Do calendar stuff here! :D
-        const calendarId = await dbQueryOne('SELECT gCalendarId FROM guild_data WHERE guildId=?', [interaction.guild.id]).gCalendarId;
-        console.log(calendarId);
-
+        const calendarId = guildData.gCalendarId;
+        console.log(`Existing calendarId: ${calendarId}`);
+        
         if(calendarId) {
           if(toggle) {
+            // If existing calendar and attempting to turn on, just return the link.
             const calendarLink = calendarStuff.createLinkFromCalendarId(calendarId);
             return interaction.followUp(`Google Calendar integration is already enabled. The calendar for this server can be found here:\n<${calendarLink}>`);
           }
           else {
+            // If existing calendar and attempting to turn off, delete the calendar.
             const deleteOutcome = calendarStuff.deleteCalendar(calendarId);
 
             if(deleteOutcome) {
-              await dbExecute('UPDATE guild_options SET gCalendarId=? WHERE guildDataId=?', [null, guildData.id]);
+              await dbExecute('UPDATE guild_data SET gCalendarId=? WHERE id=?', [null, guildData.id]);
               return interaction.followUp(`Google Calendar integration disabled.`);
             }
             else {
@@ -795,13 +797,15 @@ module.exports = {
         }
         else {
           if(toggle) {
+            // If no existing calendar and attempting to turn on, create the calendar.
             const newCalendarId = await calendarStuff.createCalendar("New Calendar!");
-            await dbExecute('UPDATE guild_options SET gCalendarId=? WHERE guildDataId=?', [newCalendarId, guildData.id]);
+            await dbExecute('UPDATE guild_data SET gCalendarId=? WHERE id=?', [newCalendarId, guildData.id]);
 
             const calendarLink = calendarStuff.createLinkFromCalendarId(newCalendarId);
             return interaction.followUp(`Google Calendar integration enabled. The calendar for this server can be found here:\n<${calendarLink}>`);
           }
           else {
+            // If no existing calendar and attempting to turn off, reply that there is no calendar.
             return interaction.followUp(`Google Calendar integration is already disabled.`);
           }
         } 

@@ -2,10 +2,10 @@ START TRANSACTION;
 
 /* Update statements here */
 ALTER TABLE guild_data
-ADD gCalendarId VARCHAR(64);
+ADD gCalendarId VARCHAR(128);
 
 ALTER TABLE scheduled_events
-ADD gEventId VARCHAR(64);
+ADD gEventId VARCHAR(128);
 
 /* Testing queries here */
 
