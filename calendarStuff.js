@@ -8,6 +8,12 @@ const config = require('./config.json');
  * works well enough for now. If I learn better ways I'll tidy it up then.
  */
 
+// Some rabbit crimes. Will fix this later.
+Date.prototype.addHours = function(h) {
+    this.setTime(this.getTime() + (h*60*60*1000));
+    return this;
+};
+
 // Create a new JWT client.
 const jwtClient = new google.auth.JWT(
   config.google_api_client_email,
@@ -75,16 +81,47 @@ async function deleteCalendar(id) {
     return outcome;
 }
 
-function addEvent() {
+// Add an event.
+async function addEvent(calendarId, name, host, role, targetDate, duration) {
+
+    // Description string.
+    const locationString = `${role ? `Type: ${role}\n` : ""}`;
+
+    // Date magic!
+    const relevantDuration = (duration) ? duration : 2;
+
+    var event = {
+        summary: name,
+        location: locationString,
+        description: `Host: ${host}`,
+        start: {
+            dateTime: targetDate.toISOString(),
+        },
+        end: {
+            dateTime: targetDate.addHours(relevantDuration).toISOString(),
+        },
+    };
+
+    // console.log(event);
+
+    await calendarAPI.events.insert({
+        calendarId: calendarId,
+        resource: event
+    }).then((result) => {
+        console.log(result.data);
+    }, defaultCalendarError);
+}
+
+async function rescheduleEvent() {
 
 }
 
-function rescheduleEvent() {
+async function cancelEvent(calendarId, eventId) {
 
-}
-
-function cancelEvent() {
-
+    await calendarAPI.events.delete({
+        calendarId: calendarId,
+        eventId: eventId
+    }).then(() => {}, defaultCalendarError);
 }
 
 // function addEvent(name, location, description, startTime, endTime) {
@@ -127,16 +164,46 @@ async function listCalendars() {
     return idList;
 }
 
-async function testAsyncStuff() {
-    var idList = await listCalendars();
+async function listEvents(calendarId) {
+    var idList;
+
+    await calendarAPI.events.list({
+        auth: jwtClient,
+        calendarId: calendarId
+    }).then((result) => {
+        for (const event of result.data.items) {
+            console.log(event);
+        }
+        idList = result.data.items.map((event) => event.id);
+        return idList;
+    }, defaultCalendarError);
+
+    return idList;
+}
+
+async function main() {
+
+    // addEvent("your calendar id here",
+    //     "The Rabbit Crimes 1.5", "Ladybunne", "LFG Themed (Unsupported)", new Date(1717714800 * 1000), null
+    // );
+
+    // var idList = await listCalendars();
 
     // Delete all calendars. Use with extreme caution.
     // for (const id of idList) {
     //     deleteCalendar(id);
     // }
+
+    // Delete all events in a specified calendar.
+    // const calendarId = "your calendar id here";
+    // var idList = await listEvents(calendarId);
+    // for(const id of idList) {
+    //     console.log(id);
+    //     await cancelEvent(calendarId, id);
+    // }
 }
 
-// testAsyncStuff();
+main();
 
 exports.createLinkFromCalendarId = createLinkFromCalendarId;
 exports.createCalendar = createCalendar;
