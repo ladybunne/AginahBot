@@ -83,7 +83,6 @@ async function deleteCalendar(id) {
 
 // Add an event.
 async function addEvent(calendarId, name, host, role, targetDate, duration) {
-
     // Description string.
     const locationString = `${role ? `Type: ${role}\n` : ""}`;
 
@@ -112,42 +111,37 @@ async function addEvent(calendarId, name, host, role, targetDate, duration) {
     }, defaultCalendarError);
 }
 
-async function rescheduleEvent() {
+async function rescheduleEvent(calendarId, eventId, targetDate, duration) {
+    // Date magic!
+    const relevantDuration = (duration) ? duration : 2;
 
+    var event = {
+        start: {
+            dateTime: targetDate.toISOString(),
+        },
+        end: {
+            dateTime: targetDate.addHours(relevantDuration).toISOString(),
+        },
+    };
+
+    // console.log(event);
+
+    await calendarAPI.events.patch({
+        calendarId: calendarId,
+        eventId: eventId,
+        resource: event
+    }).then((result) => {
+        console.log(result.data);
+    }, defaultCalendarError);
 }
 
 async function cancelEvent(calendarId, eventId) {
-
     await calendarAPI.events.delete({
         calendarId: calendarId,
         eventId: eventId
     }).then(() => {}, defaultCalendarError);
 }
 
-// function addEvent(name, location, description, startTime, endTime) {
-//   const event = {
-//     'summary': name,
-//     'location': location,
-//     'description': description,
-//     'start': {
-//       'dateTime': startTime,
-//     },
-//     'end': {
-//       'dateTime': endTime,
-//     },
-//   };
-//   calendar.events.insert({
-//     auth: jwtClient,
-//     calendarId: config.calendarId,
-//     resource: event,
-//   }, function(err, result) {
-//     if (err) {
-//       console.log('There was an error contacting the Calendar service: ' + err);
-//       return;
-//     }
-//     console.log('Event created: %s', result.data.htmlLink);
-//   });
-// }
 
 async function listCalendars() {
     var idList;
@@ -182,10 +176,16 @@ async function listEvents(calendarId) {
 }
 
 async function main() {
+    const calendarId = "calendar id here";
 
-    // addEvent("your calendar id here",
-    //     "The Rabbit Crimes 1.5", "Ladybunne", "LFG Themed (Unsupported)", new Date(1717714800 * 1000), null
+    // await addEvent(calendarId,
+    //     "The Rabbit Crimes", "Ladybunne", "LFG Themed (Unsupported)", new Date(1717714800 * 1000), 3
     // );
+
+    var idList = await listEvents(calendarId);
+
+    // await rescheduleEvent(calendarId, idList[0], new Date(1717722000 * 1000), 3);
+    await rescheduleEvent(calendarId, idList[0], new Date(1717736400 * 1000), 1);
 
     // var idList = await listCalendars();
 
@@ -195,7 +195,6 @@ async function main() {
     // }
 
     // Delete all events in a specified calendar.
-    // const calendarId = "your calendar id here";
     // var idList = await listEvents(calendarId);
     // for(const id of idList) {
     //     console.log(id);
