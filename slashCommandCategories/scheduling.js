@@ -51,7 +51,7 @@ const generateEventCode = () => {
 
 const sendScheduleMessage = async (interaction, targetDate, title = null, pingRole = null, duration = null) => {
   // Fetch guild data
-  const guildData = await dbQueryOne('SELECT id FROM guild_data WHERE guildId=?', [interaction.guildId]);
+  const guildData = await dbQueryOne('SELECT id, gCalendarId FROM guild_data WHERE guildId=?', [interaction.guild.id]);
   if (!guildData) {
     throw new Error(`Unable to find guild ${interaction.guild.name} (${interaction.guildId}) in guild_data table.`);
   }
@@ -97,12 +97,20 @@ const sendScheduleMessage = async (interaction, targetDate, title = null, pingRo
     );
   }
 
+  // Ideally Google Calendar stuff is done by now. I'll rework this so that it lines up better, hopefully.
+  var gEventId = null;
+  if(guildData.gCalendarId) {
+    gEventId = await calendarStuff.createEvent(guildData.gCalendarId, title || `${interaction.member.displayName}'s Event`,
+      interaction.member.displayName, pingRole ? pingRole.name : null, targetDate, duration);
+    console.log(gEventId);
+  }
+
   // Save scheduled event to database
   const sql = `INSERT INTO scheduled_events
-             (guildDataId, timestamp, channelId, messageId, threadId, schedulingUserId, eventCode, title, duration)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+             (guildDataId, timestamp, channelId, messageId, threadId, schedulingUserId, eventCode, title, duration, gEventId)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   await dbExecute(sql, [guildData.id, targetDate.getTime(), scheduleMessage.channel.id, scheduleMessage.id,
-    threadChannel ? threadChannel.id : null, interaction.user.id, eventCode, title, duration || null]);
+    threadChannel ? threadChannel.id : null, interaction.user.id, eventCode, title, duration || null, gEventId || null]);
 
   // Put appropriate reactions onto the message
   await scheduleMessage.react('👍');
@@ -482,7 +490,7 @@ module.exports = {
         const minutes = interaction.options.getInteger('minutes', false) || 0;
         const duration = interaction.options.getInteger('duration', false) ?? null;
 
-        let sql = `SELECT se.id, se.timestamp, se.schedulingUserId, se.channelId, se.messageId, se.title
+        let sql = `SELECT se.id, se.timestamp, se.schedulingUserId, se.channelId, se.messageId, se.title, se.duration, se.gEventId
                    FROM scheduled_events se
                    JOIN guild_data gd ON se.guildDataId = gd.id
                    WHERE gd.guildId=?
@@ -545,9 +553,19 @@ module.exports = {
         await message.edit(payload);
 
         await updateScheduleBoard(interaction.client, interaction.guild);
-        return interaction.followUp(
+        interaction.followUp(
           `Event **${eventData.title || eventCode}** updated to <t:${Math.floor(newTimestamp/1000)}:F>`
         );
+
+        // Google Calendar stuff.
+        // Need to query `guild_data` to get the calendar id, unfortunately.
+        const guildData = await dbQueryOne('SELECT gCalendarId FROM guild_data WHERE guildId=?', [interaction.guild.id]);
+        if (guildData && guildData.gCalendarId) {
+          // console.log(`new: ${duration}, old: ${eventData.duration}`);
+          await calendarStuff.rescheduleEvent(guildData.gCalendarId, eventData.gEventId, new Date(newTimestamp),
+            duration);
+            // duration ? duration : eventData.duration);
+        }
       }
     },
     {
@@ -564,7 +582,7 @@ module.exports = {
       async execute(interaction) {
         const eventCode = interaction.options.getString('event-code');
 
-        let sql = `SELECT se.id, se.channelId, se.messageId, se.threadId, se.schedulingUserId
+        let sql = `SELECT se.id, se.channelId, se.messageId, se.threadId, se.schedulingUserId, se.gEventId
                    FROM scheduled_events se
                    JOIN guild_data gd ON se.guildDataId = gd.id
                    WHERE gd.guildId=?
@@ -624,7 +642,14 @@ module.exports = {
           await dbExecute('DELETE FROM scheduled_events WHERE id=?', [eventData.id]);
 
           await updateScheduleBoard(interaction.client, interaction.guild);
-          return interaction.followUp(`Event with code ${eventCode.toUpperCase()} has been cancelled.`);
+          interaction.followUp(`Event with code ${eventCode.toUpperCase()} has been cancelled.`);
+
+          // Google Calendar stuff
+          // Need to query `guild_data` to get the calendar id, unfortunately.
+          const guildData = await dbQueryOne('SELECT gCalendarId FROM guild_data WHERE guildId=?', [interaction.guild.id]);
+          if (guildData && guildData.gCalendarId) {
+            await calendarStuff.cancelEvent(guildData.gCalendarId, eventData.gEventId);
+          }
         } catch(e) {
           console.error(e);
           return interaction.followUp('Something went wrong and the event could not be cancelled.\n' +

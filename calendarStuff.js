@@ -22,6 +22,7 @@ const jwtClient = new google.auth.JWT(
   ['https://www.googleapis.com/auth/calendar'],
   null,
 );
+
 const calendarAPI = google.calendar({ version: 'v3', auth: jwtClient });
 
 // Default ACL rule for making a calendar public (no need to redefine it each function call).
@@ -82,11 +83,12 @@ async function deleteCalendar(id) {
 }
 
 // Add an event.
-async function addEvent(calendarId, name, host, role, targetDate, duration) {
+async function createEvent(calendarId, name, host, role, targetDate, duration) {
+    var eventId;
+
     // Description string.
     const locationString = `${role ? `Type: ${role}\n` : ""}`;
 
-    // Date magic!
     const relevantDuration = (duration) ? duration : 2;
 
     var event = {
@@ -107,13 +109,22 @@ async function addEvent(calendarId, name, host, role, targetDate, duration) {
         calendarId: calendarId,
         resource: event
     }).then((result) => {
-        console.log(result.data);
+        // console.log(result.data);
+        eventId = result.data.id;
     }, defaultCalendarError);
+
+    return eventId;
 }
 
 async function rescheduleEvent(calendarId, eventId, targetDate, duration) {
+    if(!eventId) return false;
+
+    var outcome = false;
+
     // Date magic!
     const relevantDuration = (duration) ? duration : 2;
+
+    // const end = (duration) ? {dateTime: targetDate.addHours(relevantDuration).toISOString(),}
 
     var event = {
         start: {
@@ -131,15 +142,20 @@ async function rescheduleEvent(calendarId, eventId, targetDate, duration) {
         eventId: eventId,
         resource: event
     }).then((result) => {
-        console.log(result.data);
+        // console.log(result.data);
+        outcome = true;
     }, defaultCalendarError);
+
+    return outcome;
 }
 
 async function cancelEvent(calendarId, eventId) {
     await calendarAPI.events.delete({
         calendarId: calendarId,
         eventId: eventId
-    }).then(() => {}, defaultCalendarError);
+    }).then((result) => {
+        console.log(result.data);
+    }, defaultCalendarError);
 }
 
 
@@ -176,16 +192,18 @@ async function listEvents(calendarId) {
 }
 
 async function main() {
-    const calendarId = "calendar id here";
+    const calendarId = "";
 
-    // await addEvent(calendarId,
-    //     "The Rabbit Crimes", "Ladybunne", "LFG Themed (Unsupported)", new Date(1717714800 * 1000), 3
+    // const output = await createEvent(calendarId,
+    //     "The Rabbit Crimes", "Ladybunne", "LFG Themed (Unsupported)", new Date(1717822800 * 1000), 3
     // );
 
-    var idList = await listEvents(calendarId);
+    // console.log(output);
+
+    // var idList = await listEvents(calendarId);
 
     // await rescheduleEvent(calendarId, idList[0], new Date(1717722000 * 1000), 3);
-    await rescheduleEvent(calendarId, idList[0], new Date(1717736400 * 1000), 1);
+    // await rescheduleEvent(calendarId, idList[0], new Date(1717736400 * 1000), 1);
 
     // var idList = await listCalendars();
 
@@ -207,3 +225,6 @@ main();
 exports.createLinkFromCalendarId = createLinkFromCalendarId;
 exports.createCalendar = createCalendar;
 exports.deleteCalendar = deleteCalendar;
+exports.createEvent = createEvent;
+exports.rescheduleEvent = rescheduleEvent;
+exports.cancelEvent = cancelEvent;
