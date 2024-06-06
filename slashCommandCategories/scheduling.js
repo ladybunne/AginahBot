@@ -564,7 +564,7 @@ module.exports = {
           // console.log(`new: ${duration}, old: ${eventData.duration}`);
           await calendarStuff.rescheduleEvent(guildData.gCalendarId, eventData.gEventId, new Date(newTimestamp),
             duration);
-            // duration ? duration : eventData.duration);
+          // duration ? duration : eventData.duration);
         }
       }
     },
@@ -813,17 +813,17 @@ module.exports = {
 
             if(deleteOutcome) {
               await dbExecute('UPDATE guild_data SET gCalendarId=? WHERE id=?', [null, guildData.id]);
-              return interaction.followUp(`Google Calendar integration disabled.`);
+              return interaction.followUp('Google Calendar integration disabled.');
             }
             else {
-              return interaction.followUp(`Google Calendar could not be disabled due to an error.`);
+              return interaction.followUp('Google Calendar could not be disabled due to an error.');
             }
           }
         }
         else {
           if(toggle) {
             // If no existing calendar and attempting to turn on, create the calendar.
-            const newCalendarId = await calendarStuff.createCalendar("New Calendar!");
+            const newCalendarId = await calendarStuff.createCalendar('New Calendar!');
             await dbExecute('UPDATE guild_data SET gCalendarId=? WHERE id=?', [newCalendarId, guildData.id]);
 
             const calendarLink = calendarStuff.createLinkFromCalendarId(newCalendarId);
@@ -831,7 +831,7 @@ module.exports = {
           }
           else {
             // If no existing calendar and attempting to turn off, reply that there is no calendar.
-            return interaction.followUp(`Google Calendar integration is already disabled.`);
+            return interaction.followUp('Google Calendar integration is already disabled.');
           }
         } 
       }
